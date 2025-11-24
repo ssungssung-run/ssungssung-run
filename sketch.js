@@ -224,6 +224,7 @@ function keyPressed() {
   // 2) 플레이 상태에서: 점프 입력만 처리
   if (gameState === "playing") {
     if (keyCode === UP_ARROW && player.onGround && !player.isDead) {
+      // 점프&숙이기 로직
       player.vy = jumpPower;
       player.onGround = false;
     }
