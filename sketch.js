@@ -19,7 +19,8 @@ const GAME_W = 520;     // 가로 폭
 let GAME_H;             // 세로는 창 높이(windowHeight) 사용
 
 // 인트로 / 게임 상태
-let gameState = "intro"; // "intro" | "playing" | "gameover"
+let gameState = "intro"; // "intro" | "modeSelect" | "playing" | "gameover"
+let selectedMode = null; // "face" | "voice"
 let startTime = 0;
 let score = 0;
 let bestScore = 0;
@@ -137,6 +138,12 @@ function draw() {
     return;
   }
 
+  if (gameState === "modeSelect") {
+    // 모드 선택 화면
+    drawModeSelectScreen();
+    return;
+  }
+
   if (gameState === "playing") {
     score = floor((millis() - startTime) / 1000); // 초 단위
   }  
@@ -177,6 +184,13 @@ function draw() {
 
     applyPlatformCollision();
     checkFallingIntoWater();  // 여기서 죽으면 gameState 바꿀 거야
+    
+    // 선택된 모드에 따라 분기 처리
+    if (selectedMode === "face") {
+      updateFaceMode();
+    } else if (selectedMode === "voice") {
+      updateVoiceMode();
+    }
   }
 
   // 8) 캐릭터 그리기
@@ -201,27 +215,35 @@ function draw() {
 
 // ===================== 입력 처리 =====================
 function keyPressed() {
-  // 1) 인트로 상태에서: 스페이스 or Enter 누르면 게임 시작
+  // 1) 인트로 상태에서: 스페이스 or Enter 누르면 모드 선택으로
   if (gameState === "intro") {
     if (key === ' ' || keyCode === ENTER) {
-      initGame();            // 발판/플레이어 위치 리셋
-      player.isDead = false;
-      gameState = "playing"; // 플레이 상태로 전환
+      gameState = "modeSelect"; // 모드 선택 화면으로 전환
     }
     return; // intro일 땐 여기서 끝
   }
 
-  if (gameState === "intro") {
-    if (key === " ") {
+  // 2) 모드 선택 상태에서: 1번 또는 2번 눌러서 모드 선택
+  if (gameState === "modeSelect") {
+    if (key === '1') {
+      selectedMode = "face";
       initGame();
+      player.isDead = false;
+      startTime = millis();
       score = 0;
-      startTime = millis();     // 시간 재기 시작
+      gameState = "playing";
+    } else if (key === '2') {
+      selectedMode = "voice";
+      initGame();
+      player.isDead = false;
+      startTime = millis();
+      score = 0;
       gameState = "playing";
     }
     return;
   }
-  
-  // 2) 플레이 상태에서: 점프 입력만 처리
+
+  // 3) 플레이 상태에서: 점프 입력만 처리
   if (gameState === "playing") {
     if (keyCode === UP_ARROW && player.onGround && !player.isDead) {
       // 점프&숙이기 로직
@@ -231,13 +253,11 @@ function keyPressed() {
     return;
   }
 
-  // 3) 게임오버 상태에서: 스페이스 누르면 재시작
+  // 4) 게임오버 상태에서: 스페이스 누르면 모드 선택으로 돌아가기
   if (gameState === "gameover") {
     if (key === " ") {
-      initGame();
-      startTime = millis();
-      score = 0;
-      gameState = "playing";
+      selectedMode = null;
+      gameState = "modeSelect";
     }
     return;
   }
@@ -245,7 +265,25 @@ function keyPressed() {
 
 
 
-// ===================== 3. GAME SCREENS (INTRO / GAME OVER) =====================
+// ===================== 3. GAME SCREENS (INTRO / MODE SELECT / GAME OVER) =====================
+
+// 모드 선택 화면
+function drawModeSelectScreen() {
+  image(introBg, 0, 0, GAME_W, GAME_H);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+
+  textSize(50);
+  text("모드 선택", GAME_W / 2, GAME_H / 2 - 100);
+
+  textSize(30);
+  text("1. 표정 모드", GAME_W / 2, GAME_H / 2);
+  text("2. 목소리 모드", GAME_W / 2, GAME_H / 2 + 60);
+
+  textSize(20);
+  text("숫자 키를 눌러 모드를 선택하세요", GAME_W / 2, GAME_H / 2 + 140);
+}
 
 // 아웃트로 (점수 포함 화면)
 function drawGameOverScreen() {
@@ -625,6 +663,18 @@ function updateInfinitePlatforms() {
 
 
 // ===================== 8. PHYSICS / COLLISION / DEATH =====================
+
+// ===================== 모드별 업데이트 함수 (사용자가 구현 예정) =====================
+// 표정 모드 업데이트 함수
+function updateFaceMode() {
+  // TODO: 표정 모드 로직 구현
+}
+
+// 목소리 모드 업데이트 함수
+function updateVoiceMode() {
+  // TODO: 목소리 모드 로직 구현
+}
+
 function applyPlatformCollision() {
   const pxWorld = player.x + worldOffset;     // 스크롤 포함한 실제 x
 
