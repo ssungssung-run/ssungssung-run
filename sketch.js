@@ -362,6 +362,10 @@ function handlePlayerInput() {
       // 행복하거나 놀란 표정이면 점프!
       if (currentExpression === 'happy' || currentExpression === 'surprised') {
         player.jump();
+      } else if (['sad', 'angry', 'fearful', 'disgusted'].includes(currentExpression)) {
+        player.crouchOn();
+      } else {
+        player.crouchOff();
       }
     } 
     else if (selectedMode === 'voice') {
@@ -601,7 +605,7 @@ class Player {
 
     // 숙이기 시작
     crouchOn() {
-        if (this.isDead) return;
+        if (this.isDead || !this.onGround) return;
         this.isCrouching = true;
     }
 
@@ -1053,7 +1057,7 @@ function drawGameOverScreen() {
   fill(255); textAlign(CENTER, CENTER);
   textSize(50); text("GAME OVER", width/2, height/2 - 50);
   textSize(30); text(`Score: ${score}s`, width/2, height/2 + 20);
-  textSize(20); text("Press SPACE to Menu", width/2, height/2 + 120);
+  textSize(20); text("Click to Menu", width/2, height/2 + 120);
 }
 
 function drawScore() {
@@ -1064,7 +1068,7 @@ function drawScore() {
 function drawWarningOverlay() {
   fill(0, 200); rect(0, 0, width, height);
   fill(255, 50, 50); textSize(35); textAlign(CENTER, CENTER);
-  text("⚠️ 각도 주의 ⚠️", width / 2, height / 2 - 50);
+  text("각도 주의", width / 2, height / 2 - 50);
   fill(255); textSize(25); text(warningMessage, width / 2, height / 2 + 20);
 }
 
