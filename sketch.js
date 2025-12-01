@@ -956,28 +956,43 @@ class Player {
 
     // 발판과 부딪혔는지 검사하는 함수
     checkCollision(platforms) {
-        if (this.isDead) return;
-        const pxWorld = this.x + worldOffset; // 플레이어의 실제 맵 상 위치 (화면위치 + 이동거리)
-        const footY = this.y + this.size / 2; // 플레이어 발바닥 위치
-        const prevFootY = footY - this.vy;    // 바로 직전 프레임의 발바닥 위치
+      if (this.isDead) return;
+      
+      const pxWorld = this.x + worldOffset; // 플레이어 중심 X
+      const footY = this.y + this.size / 2; // 플레이어 발바닥 Y
+      const prevFootY = footY - this.vy;    // 1프레임 전 발바닥 위치
 
-        for (let p of platforms) {
-          const pLeft = p.x;
-          const pRight = p.x + p.w;
-          const pTop = p.y - p.h;
+      // [중요] 플레이어의 "발 너비" 설정
+      // size가 80일 때 약 40px 정도를 유효한 발판 밟기 너비로 봅니다.
+      const hitWidth = this.size * 0.5; 
 
-          // 1. 가로 범위 체크: 플레이어가 발판 위에 있는가?
-          if (pxWorld > pLeft + 10 && pxWorld < pRight - 10) { 
-            // 2. 세로 범위 체크: 발이 발판 높이를 통과했는가?
-            // (내려오는 중이고(vy>=0), 발은 발판 아래에, 직전엔 발판 위에 있었어야 함)
-            if (this.vy >= 0 && footY >= pTop && prevFootY <= pTop + 10) {
-              this.y = pTop - this.size / 2; // 발판 위로 위치 고정
-              this.vy = 0; // 떨어지는 속도 없애기
-              this.onGround = true; // 땅에 닿음 판정
-              return; 
-            }
+      // 플레이어의 좌우 발 끝 좌표 계산
+      const playerLeft = pxWorld - hitWidth / 2;
+      const playerRight = pxWorld + hitWidth / 2;
+
+      for (let p of platforms) {
+        const pLeft = p.x;
+        const pRight = p.x + p.w;
+        const pTop = p.y - p.h;
+
+        // 1. 가로 겹침 판정 (AABB 충돌 감지)
+        // "플레이어 오른쪽 끝이 발판 왼쪽보다 안쪽에 있고" AND
+        // "플레이어 왼쪽 끝이 발판 오른쪽보다 안쪽에 있으면" 겹친 것으로 인정
+        if (playerRight > pLeft && playerLeft < pRight) { 
+          
+          // 2. 세로 착지 판정 (고속 낙하 보정 포함)
+          // 발이 발판 높이보다 낮아졌는데(footY >= pTop),
+          // 직전 프레임에는 발판보다 위에 있었거나 근처였을 때(prevFootY <= pTop + 15)
+          // (+15로 범위 늘려서 아주 빨리 떨어져도 잡히게 함)
+          if (this.vy >= 0 && footY >= pTop && prevFootY <= pTop + 15) {
+            
+            this.y = pTop - this.size / 2; // 위치 고정
+            this.vy = 0;                   // 속도 0
+            this.onGround = true;          // 착지 성공
+            return; 
           }
         }
+      }
     }
 
     die() {
