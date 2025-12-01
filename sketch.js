@@ -96,6 +96,27 @@ let currentExpression = 'neutral'; // 현재 표정 (happy, neutral 등)
 let faceAngleWarning = false;      // 자세가 나쁜지 체크
 let warningMessage = "";           // 경고 메시지 내용
 
+// 음성 인식 관련 변수 (Voice 모드)
+let audioContext;
+let mic;
+let pitch;
+let audioStarted = false;
+let voiceModelLoaded = false;
+let currentPitch = 0;
+let currentNote = "";
+let baselinePitch = 0; // 기준 음정
+let pitchHistory = [];
+let calibrating = false;
+let calibrationTime = 0;
+let smoothedPitch = 0; // 스무딩된 피치 값
+let pitchSmoothFactor = 0.4; // 스무딩 정도 (0-1, 높을수록 빠른 반응)
+let lastValidPitch = 0; // 마지막 유효한 피치
+let volumeThreshold = 0.015; // 볼륨 임계값 (낮추면 더 민감)
+let calibrationMessage = "편안한 음정으로 소리를 내주세요"; // 캘리브레이션 메시지
+let voiceLoadStartTime = 0; // Voice 모드 로딩 시작 시간
+let calibrationStartTime = 0; // 캘리브레이션 시작 시간
+let calibrationFailCount = 0; // 캘리브레이션 실패 횟수
+
 // ==========================================
 // 3. 초기화 (SETUP)
 // ==========================================
@@ -233,6 +254,11 @@ function draw() {
   if (selectedMode === 'face' && faceAngleWarning && gameState === 'playing') {
     drawWarningOverlay();
   }
+
+  // Voice 모드일 때 캘리브레이션 중이면 오버레이 띄우기
+  if (selectedMode === 'voice' && calibrating && gameState === 'playing') {
+    drawCalibrationOverlay();
+  }
 }
 
 // ==========================================
@@ -240,6 +266,13 @@ function draw() {
 // ==========================================
 
 function runGame() {
+  // Voice 모드이고 캘리브레이션 중이면 게임 로직 일시 중지
+  if (selectedMode === 'voice' && calibrating) {
+    drawWorld(true);           // 배경만 그리기
+    drawPlayer();              // 플레이어만 그리기
+    return;
+  }
+
   // 점수 계산(초)
   score = floor((millis() - startTime) / 1000);
 
@@ -267,6 +300,12 @@ function initGame() {
   score = 0;
   faceAngleWarning = false;
   currentExpression = 'neutral';
+  
+  // Voice 모드 변수 초기화
+  if (selectedMode === 'voice') {
+    // 캘리브레이션은 startVoiceCalibration에서 처리
+    // 여기서는 게임 관련 변수만 초기화
+  }
   
   player.reset(); // 플레이어 위치 초기화
   
@@ -357,21 +396,65 @@ function alignPlayerToStart() {
 
 // 플레이어의 점프 입력을 처리
 function handlePlayerInput() {
-  if (player.onGround) { // 땅에 있을 때만 점프 가능
-    if (selectedMode === 'face') {
+  if (selectedMode === 'face') {
+    // 얼굴 모드: 땅에 있을 때만 점프 가능
+    if (player.onGround) {
       // 행복하거나 놀란 표정이면 점프!
       if (currentExpression === 'happy' || currentExpression === 'surprised') {
         player.jump();
       }
-    } 
-    else if (selectedMode === 'voice') {
-    // TODO: 음성 로직
+    }
+  } 
+  else if (selectedMode === 'voice') {
+    // 음성 모드: 피치 기반 제어
+    controlPlayerWithPitch();
+  }
+
+  // 키보드 테스트용 (위 화살표나 스페이스바)
+  if (keyIsDown(UP_ARROW) || keyIsDown(32)) { 
+    if (player.onGround) {
+      player.jump();
+    }
+  }
+}
+
+// Voice 모드: 피치 기반 플레이어 제어
+function controlPlayerWithPitch() {
+  // 캘리브레이션 중이면 제어하지 않음
+  if (calibrating || !baselinePitch || baselinePitch === 0) {
+    return;
+  }
+
+  if (currentPitch > 0 && baselinePitch > 0) {
+    // 피치 스무딩 적용
+    smoothedPitch = smoothedPitch * (1 - pitchSmoothFactor) + currentPitch * pitchSmoothFactor;
+
+    // Hz 차이 대신 Cents(상대 음정) 차이를 계산
+    let centsDiff = frequencyToCents(baselinePitch, smoothedPitch);
+
+    // 기준 음정 근처 (-150 Cents ~ +200 Cents) -> 숙이기
+    if (centsDiff >= -150 && centsDiff < 200) {
+      if (player.onGround) {
+        player.crouchOn();
+      }
+    } else {
+      player.crouchOff();
     }
 
-    // 키보드 테스트용 (위 화살표나 스페이스바)
-    if (keyIsDown(UP_ARROW) || keyIsDown(32)) { 
-    player.jump();
+    // 높은 음 (200 Cents 이상) -> 점프 (지면에 있을 때만)
+    if (centsDiff >= 200 && player.onGround) {
+      // Cents 차이에 따라 점프력 조절
+      let jumpPower = map(centsDiff, 200, 700, 15, 25);
+      jumpPower = constrain(jumpPower, 15, 25);
+      
+      // Player 클래스의 jump 메서드가 점프력을 받을 수 있도록 수정 필요
+      // 일단 기본 점프 사용
+      player.jump();
     }
+  } else {
+    // 소리를 내지 않을 때
+    smoothedPitch = smoothedPitch * 0.8; // 천천히 감소
+    player.crouchOff(); // 일어서 있기 (기본 자세)
   }
 }
 
@@ -427,6 +510,249 @@ function setupFaceAPI() {
   }
 }
 
+// ==========================================
+// 6-1. ML5 음성 인식 로직 (Voice Mode)
+// ==========================================
+
+function setupVoiceAPI() {
+  console.log("setupVoiceAPI 호출됨");
+  voiceLoadStartTime = millis(); // 로딩 시작 시간 기록
+
+  // 이미 모델이 준비되어 있으면 → 캘리브레이션이 필요한지 확인
+  if (voiceModelLoaded && pitch && audioStarted) {
+    console.log("이미 Voice 모델 준비됨");
+    // baselinePitch가 이미 설정되어 있으면 캘리브레이션 건너뛰기
+    if (baselinePitch > 0) {
+      console.log("이미 캘리브레이션 완료됨 (기준 음정:", baselinePitch.toFixed(2), "Hz) - 바로 게임 시작");
+      calibrating = false;
+
+      // ★★★ [수정된 부분] 여기서 getPitch()를 다시 실행시켜야 합니다! ★★★
+      getPitch(); 
+      
+      startGame();
+    } else {
+      console.log("캘리브레이션 필요 - 캘리브레이션 시작");
+      startVoiceCalibration();
+    }
+    return;
+  }
+
+  // 오디오 컨텍스트를 먼저 가져와서 활성화 (사용자 클릭 직후)
+  audioContext = getAudioContext();
+  if (audioContext) {
+    // 오디오 컨텍스트를 즉시 활성화
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(err => {
+        console.warn("오디오 컨텍스트 활성화 경고:", err);
+      });
+    }
+  }
+
+  // 마이크 시작
+  console.log("마이크 시작 중...");
+  mic = new p5.AudioIn();
+  mic.start(() => {
+    console.log("✓ 마이크 시작됨");
+    audioStarted = true;
+
+    // 오디오 컨텍스트 재확인 및 활성화
+    audioContext = getAudioContext();
+    console.log("✓ 오디오 컨텍스트:", audioContext, "상태:", audioContext ? audioContext.state : "없음");
+    if (!audioContext) {
+      console.error("오디오 컨텍스트를 가져올 수 없습니다");
+      handleVoiceLoadError("오디오 컨텍스트 초기화 실패");
+      return;
+    }
+
+    // 오디오 컨텍스트를 명시적으로 활성화 (중요!)
+    if (audioContext.state === 'suspended') {
+      console.log("오디오 컨텍스트 활성화 중...");
+      audioContext.resume().then(() => {
+        console.log("✓ 오디오 컨텍스트 활성화 완료");
+        loadPitchModel();
+      }).catch((err) => {
+        console.warn("오디오 컨텍스트 활성화 경고 (무시하고 계속):", err);
+        // 경고가 나와도 계속 진행
+        loadPitchModel();
+      });
+    } else {
+      console.log("✓ 오디오 컨텍스트 이미 활성화됨");
+      loadPitchModel();
+    }
+  }, (err) => {
+    console.error("마이크 시작 에러:", err);
+    handleVoiceLoadError("마이크 권한이 필요합니다. 브라우저 설정을 확인해주세요.");
+  });
+}
+
+// 피치 모델 로드 함수 분리
+function loadPitchModel() {
+  // ml5 피치 감지 모델 로드 (로컬 모델 경로 사용)
+  if (typeof ml5 !== 'undefined') {
+    console.log("✓ ml5 로드됨, 버전:", ml5.version);
+    console.log("CREPE 모델 로딩 시작...");
+    
+    // mic.stream이 없을 수 있으므로 확인
+    if (!mic || !mic.stream) {
+      console.error("마이크 스트림을 가져올 수 없습니다");
+      handleVoiceLoadError("마이크 스트림 초기화 실패");
+      return;
+    }
+    
+    try {
+      pitch = ml5.pitchDetection('./audio_models/crepe/', audioContext, mic.stream, voiceModelReady);
+      if (!pitch) {
+        console.error("피치 감지 객체 생성 실패");
+        handleVoiceLoadError("피치 감지 모델 초기화 실패");
+      }
+    } catch (err) {
+      console.error("모델 로드 에러:", err);
+      handleVoiceLoadError("모델 로드 실패: " + err.message);
+    }
+  } else {
+    console.error("ml5가 로드되지 않았습니다");
+    handleVoiceLoadError("ml5 라이브러리가 로드되지 않았습니다");
+  }
+}
+
+// Voice 모드 로드 오류 처리
+function handleVoiceLoadError(message) {
+  console.error("Voice 모드 로드 오류:", message);
+  // 에러가 발생해도 게임을 시작하도록 함 (키보드로 테스트 가능하도록)
+  console.log("⚠️ " + message + " - 키보드로 게임을 플레이할 수 있습니다.");
+  voiceLoadStartTime = 0;
+  startGame();
+}
+
+function voiceModelReady() {
+  console.log("✓ 피치 감지 모델 로드 완료!");
+  voiceModelLoaded = true;
+  voiceLoadStartTime = 0; // 로딩 완료 표시
+  
+  // baselinePitch가 이미 설정되어 있으면 캘리브레이션 건너뛰기
+  if (baselinePitch > 0) {
+    console.log("이미 캘리브레이션 완료됨 (기준 음정:", baselinePitch.toFixed(2), "Hz) - 캘리브레이션 건너뛰기");
+    calibrating = false;
+    startGame();
+  } else {
+    console.log("캘리브레이션 시작 전...");
+    startVoiceCalibration();
+  }
+}
+
+function startVoiceCalibration() {
+  calibrating = true;
+  calibrationTime = 0;
+  calibrationStartTime = millis(); // 캘리브레이션 시작 시간 기록
+  calibrationFailCount = 0; // 실패 횟수 초기화
+  pitchHistory = [];
+  baselinePitch = 0;
+  smoothedPitch = 0;
+  lastValidPitch = 0;
+  calibrationMessage = "편안한 음정으로 소리를 내주세요";
+  console.log("캘리브레이션 시작...");
+  
+  // 피치 감지 시작
+  getPitch();
+  
+  // 게임 시작 (캘리브레이션 중에도 게임 화면으로 전환)
+  console.log("게임 시작 중...");
+  startGame();
+  console.log("게임 상태:", gameState);
+}
+
+// 캘리브레이션 건너뛰기
+function skipCalibration() {
+  console.log("캘리브레이션 건너뛰기");
+  calibrating = false;
+  baselinePitch = 0; // 기준 음정 없이 진행 (키보드로만 플레이)
+  calibrationMessage = "캘리브레이션 건너뛰기 - 키보드로 플레이하세요";
+}
+
+function getPitch() {
+  if (pitch && voiceModelLoaded && selectedMode === 'voice') {
+    pitch.getPitch((err, frequency) => {
+      if (err) {
+        console.error(err);
+      }
+
+      let level = mic.getLevel();
+
+      if (frequency && level > volumeThreshold) {
+        let isValidPitch = true;
+
+        if (lastValidPitch > 0) {
+          let pitchChange = Math.abs(frequency - lastValidPitch);
+          if (pitchChange > 300) {
+            isValidPitch = false;
+          }
+        }
+
+        if (isValidPitch) {
+          currentPitch = frequency;
+          currentNote = frequencyToNote(frequency);
+          lastValidPitch = frequency;
+
+          if (calibrating) {
+            pitchHistory.push(frequency);
+            calibrationTime++;
+
+            if (calibrationTime >= 180) {
+              // 캘리브레이션 완료 조건: 최소 50프레임 유효한 소리
+              if (pitchHistory.length > 50) {
+                baselinePitch = pitchHistory.reduce((a, b) => a + b) / pitchHistory.length;
+                console.log("✅ 캘리브레이션 완료! 기준 음정 설정:", baselinePitch.toFixed(2), "Hz");
+                calibrating = false;
+                pitchHistory = [];
+                calibrationMessage = "캘리브레이션 완료!";
+              } else {
+                // 유효한 소리가 충분하지 않으면 캘리브레이션 리셋
+                console.log("⚠️ 캘리브레이션 실패: 소리가 충분하지 않습니다. (감지된 프레임:", pitchHistory.length, "/50) 재시도...");
+                calibrationTime = 0;
+                pitchHistory = [];
+                calibrationMessage = "소리가 감지되지 않았습니다. 다시 시도합니다.";
+              }
+            }
+          }
+        }
+      } else if (level <= volumeThreshold) {
+        // 소리가 없으면 currentPitch만 0으로
+        currentPitch = 0;
+        currentNote = "";
+      }
+
+      if (selectedMode === 'voice') {
+        getPitch();
+      }
+    });
+  }
+}
+
+// 주파수(Hz)를 두 음 사이의 Cents 차이로 변환
+function frequencyToCents(freq1, freq2) {
+  if (!freq1 || !freq2) return 0; // 0으로 나누기 방지
+  return 1200 * Math.log2(freq2 / freq1);
+}
+
+// 주파수를 음계로 변환하는 함수
+function frequencyToNote(frequency) {
+  if (frequency < 20) return "";
+
+  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+  // A4 = 440Hz를 기준으로 계산
+  const A4 = 440;
+  const C0 = A4 * Math.pow(2, -4.75); // C0 주파수
+
+  const halfSteps = 12 * Math.log2(frequency / C0);
+  const octave = Math.floor(halfSteps / 12);
+  const noteIndex = Math.round(halfSteps % 12);
+
+  const noteName = noteNames[noteIndex];
+
+  return noteName + octave;
+}
+
 function modelReady() {
   console.log("FaceAPI Ready!");
   isModelReady = true;
@@ -439,39 +765,6 @@ function modelReady() {
   // 로딩 화면에서 넘어온 거라면 바로 게임 시작
   startGame();
   selectedMode = "face";  // 현재 모드 표시
-}
-
-function gotResults(err, result) {
-  if (err) {
-    faceapi.detect(gotResults);
-    return;
-  }
-  detections = result; // 결과 저장
-
-  // 얼굴이 1명이라도 감지되었다면
-  if (detections && detections.length > 0) {
-    const firstFace = detections[0];
-    
-    // 얼굴 각도 검사
-    const angleCheck = checkFaceAngle(firstFace);
-    faceAngleWarning = angleCheck.isBad;
-    warningMessage = angleCheck.message;
-
-    // 자세가 바를 때만 표정 인식 (자세가 나쁘면 중립으로 처리)
-    if (!faceAngleWarning) {
-        currentExpression = getDominantExpression(firstFace.expressions);
-    } else {
-        currentExpression = 'neutral';
-    }
-  } else {
-    currentExpression = 'neutral';
-    faceAngleWarning = false;
-  }
-  
-  // 계속해서 다음 프레임 얼굴 감지 요청 (재귀 호출)
-  if (selectedMode === 'face') {
-    faceapi.detect(gotResults);
-  }
 }
 
 function gotResults(err, result) {
@@ -1036,7 +1329,34 @@ function drawLoadingScreen() {
   rect(0, 0, width, height);
     
   fill(255); textAlign(CENTER, CENTER);
-  textSize(32); text("Loading Face Model...", width/2, height/2 - 20);
+  if (selectedMode === 'voice') {
+    textSize(32); text("Loading Voice Model...", width/2, height/2 - 20);
+    
+    // 모델이 로드되었지만 아직 게임이 시작되지 않은 경우 (안전장치)
+    if (voiceModelLoaded && gameState === 'loading') {
+      console.log("⚠️ 모델 로드 완료되었으나 게임이 시작되지 않음 - 강제 시작");
+      startVoiceCalibration();
+    }
+    
+    // Voice 모드 타임아웃 체크 (10초)
+    if (voiceLoadStartTime > 0) {
+      let elapsed = millis() - voiceLoadStartTime;
+      if (elapsed > 10000) {
+        console.warn("Voice 모드 로딩 타임아웃 - 게임 시작");
+        voiceLoadStartTime = 0;
+        // 모델이 로드되지 않았어도 게임 시작 (키보드로 플레이 가능)
+        if (!voiceModelLoaded) {
+          handleVoiceLoadError("모델 로딩이 시간 초과되었습니다. 키보드로 플레이할 수 있습니다.");
+        } else if (gameState === 'loading') {
+          // 모델은 로드되었지만 게임이 시작되지 않은 경우
+          console.log("모델 로드 완료 - 게임 시작");
+          startVoiceCalibration();
+        }
+      }
+    }
+  } else {
+    textSize(32); text("Loading Face Model...", width/2, height/2 - 20);
+  }
     
   // 로딩 게이지 테두리
   noFill(); stroke(255);
@@ -1046,6 +1366,32 @@ function drawLoadingScreen() {
   fill(255); noStroke();
   let loadingW = (frameCount % 60) / 60 * 196; 
   rect(width/2 - 98, height/2 + 32, loadingW, 16);
+}
+
+// Voice 모드 캘리브레이션 오버레이
+function drawCalibrationOverlay() {
+  fill(0, 200);
+  rect(0, 0, width, height);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(24);
+  text("캘리브레이션 중...", width / 2, height / 2 - 50);
+  
+  textSize(16);
+  fill(200);
+  text(calibrationMessage, width / 2, height / 2);
+  text("(3초간 기준 음정을 설정합니다)", width / 2, height / 2 + 30);
+
+  // 진행 바
+  let progress = calibrationTime / 180;
+  let barWidth = 300;
+  noFill();
+  stroke(255);
+  rect(width / 2 - barWidth / 2, height / 2 + 70, barWidth, 20);
+  fill(100, 200, 255);
+  noStroke();
+  rect(width / 2 - barWidth / 2, height / 2 + 70, barWidth * progress, 20);
 }
 
 function drawGameOverScreen() {
@@ -1104,7 +1450,8 @@ function mousePressed() {
     // ▶ 음성 모드 (Voice Mode)
     if (isInside(voiceBtn)) {
       selectedMode = 'voice';
-      startGame();            // 바로 게임 시작
+      gameState = 'loading';   // 음성 모델 로딩 화면으로 이동
+      setupVoiceAPI();         // 음성 인식 로딩 시작
       return;
     }
   }
@@ -1117,7 +1464,28 @@ function mousePressed() {
 }
 
 function startGame() {
+  console.log("startGame() 호출됨 - 이전 상태:", gameState);
   initGame();
   startTime = millis();
   gameState = 'playing';
+  console.log("startGame() 완료 - 현재 상태:", gameState);
+}
+
+// ==========================================
+// 10. 키보드 입력 처리
+// ==========================================
+
+function keyPressed() {
+  // 게임 오버 화면에서 스페이스바로 메뉴로
+  if (keyCode === 32) { // SPACE
+    if (gameState === 'gameover') {
+      gameState = 'modeSelect';
+      selectedMode = null;
+    }
+  }
+
+  // Voice 모드에서 'C' 키로 재보정
+  if ((key === 'c' || key === 'C') && selectedMode === 'voice' && gameState === 'playing') {
+    startVoiceCalibration();
+  }
 }
