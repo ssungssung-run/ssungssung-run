@@ -359,7 +359,6 @@ function alignPlayerToStart() {
 function handlePlayerInput() {
   if (player.onGround) { // 땅에 있을 때만 점프 가능
     if (selectedMode === 'face') {
-        console.log(currentExpression);
       // 행복하거나 놀란 표정이면 점프!
       if (currentExpression === 'happy' || currentExpression === 'surprised') {
         player.jump();
