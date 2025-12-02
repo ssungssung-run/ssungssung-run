@@ -60,7 +60,7 @@ let bodyFont;
 
 // 이미지 파일들을 담아둘 객체
 let assets = {
-    introBg: null, logo: null, idle: null, jump: null, waves: [], titleFont: null, bodyFont: null
+    introBg: null, logo: null, idle: null, jump: null, waves: [], titleFont: null, bodyFont: null, bgm: null
 };
 
 let isModelReady = false;   // AI 모델이 로딩 다 됐는지 확인하는 깃발
@@ -88,7 +88,7 @@ let waveAnimOffset = 0; // 파도 물결 애니메이션을 위한 변수
 
 let player;       // 플레이어 캐릭터 객체
 let platforms = []; // 화면에 보이는 발판들의 리스트
-let obstacles = []; // 장애물 리스트
+let obstacles = []; // 장애물 리스트
 
 // 얼굴 인식 결과 저장용
 let detections = [];
@@ -141,6 +141,8 @@ function preload() {
 
   assets.titleFont = loadFont("fonts/CookieRun_Bold.ttf");
   assets.bodyFont = loadFont("fonts/CookieRun_Regular.ttf");
+
+  assets.bgm = loadSound("sounds/bgm.mp3");
 }
 
 function setup() {
@@ -709,6 +711,11 @@ function getPitch() {
                 calibrating = false;
                 pitchHistory = [];
                 calibrationMessage = "캘리브레이션 완료!";
+
+                if (assets.bgm && !assets.bgm.isPlaying()) {
+                  assets.bgm.setVolume(0.5);
+                  assets.bgm.loop();
+                }
               } else {
                 // 유효한 소리가 충분하지 않으면 캘리브레이션 리셋
                 console.log("⚠️ 캘리브레이션 실패: 소리가 충분하지 않습니다. (감지된 프레임:", pitchHistory.length, "/50) 재시도...");
@@ -1004,6 +1011,11 @@ class Player {
       this.isDead = true;
       gameState = 'gameover';
       bestScore = max(bestScore, score);
+
+      // 죽으면 배경음악 정지
+      if (assets.bgm && assets.bgm.isPlaying()) {
+        assets.bgm.stop(); 
+      }
     }
 
     // 물에 빠졌는지 체크
@@ -1488,6 +1500,18 @@ function startGame() {
   startTime = millis();
   gameState = 'playing';
   console.log("startGame() 완료 - 현재 상태:", gameState);
+
+  // 게임 시작 시 배경음악 재생 (음성모드일 경우 캘리브레이션 완료 후 재생)
+  let shouldPlayMusic = true;
+  
+  if (selectedMode === 'voice' && calibrating) {
+    shouldPlayMusic = false; // 캘리브레이션 중이면 일단 음악 끔
+  }
+
+  if (shouldPlayMusic && assets.bgm && !assets.bgm.isPlaying()) {
+    assets.bgm.setVolume(0.5);
+    assets.bgm.loop();
+  }
 }
 
 // ==========================================
