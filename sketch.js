@@ -244,7 +244,29 @@ function draw() {
     drawLoadingScreen();
   } 
   else if (gameState === 'playing') {
-    runGame();
+    // 얼굴 모드에서 각도가 틀어졌을 때 -> 게임 일시정지
+    if (selectedMode === 'face' && faceAngleWarning) {
+        // 게임 로직(runGame)을 실행하지 않고 화면만 그립니다.
+        drawWorld(false); // false = 파도 애니메이션 멈춤
+        drawPlayer();     // 플레이어 그리기
+        drawScore();      // 점수판 그리기
+        drawWarningOverlay(); // 경고창 띄우기
+
+        // 멈춰있는 동안 점수 계산 X
+        startTime += deltaTime; 
+    }
+    // 보이스 모드 캘리브레이션 중일 때 -> 게임 일시정지
+    else if (selectedMode === 'voice' && calibrating) {
+        drawWorld(true);
+        drawPlayer();
+        drawCalibrationOverlay();
+        // 캘리브레이션 중에는 점수를 계산 X
+        startTime += deltaTime; 
+    }
+    // 상황 3: 아무 문제 없을 때 -> 게임 정상 진행!
+    else {
+        runGame();
+    }
   } 
   else if (gameState === 'gameover') {
     drawWorld(false);
@@ -268,13 +290,6 @@ function draw() {
 // ==========================================
 
 function runGame() {
-  // Voice 모드이고 캘리브레이션 중이면 게임 로직 일시 중지
-  if (selectedMode === 'voice' && calibrating) {
-    drawWorld(true);           // 배경만 그리기
-    drawPlayer();              // 플레이어만 그리기
-    return;
-  }
-
   // 점수 계산(초)
   score = floor((millis() - startTime) / 1000);
 
@@ -1439,7 +1454,7 @@ function drawScore() {
 }
 
 function drawWarningOverlay() {
-  fill(0, 200); rect(0, 0, width, height);
+  fill(0, 100); rect(0, 0, width, height);
   fill(255, 50, 50); textSize(35); textAlign(CENTER, CENTER);
   text("각도 주의", width / 2, height / 2 - 50);
   fill(255); textSize(25); text(warningMessage, width / 2, height / 2 + 20);
