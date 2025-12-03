@@ -54,6 +54,10 @@ const DETECTION_OPTIONS = {
 
 let canvas, cam, faceapi; // 캔버스, 웹캠, 얼굴인식 도구
 
+// 룰 텍스트
+let ruleLines = null;
+let RULE = {};
+
 // 폰트
 let titleFont;
 let bodyFont;
@@ -121,7 +125,7 @@ let calibrationFailCount = 0; // 캘리브레이션 실패 횟수
 // 3. 초기화 (SETUP)
 // ==========================================
 
-// 이미지 로드
+// 이미지,텍스트 로드
 function preload() {
   assets.introBg = loadImage("images/intro_bg.png");
   assets.ruleBg = loadImage("images/rule_bg.png")
@@ -143,6 +147,8 @@ function preload() {
   assets.bodyFont = loadFont("fonts/CookieRun_Regular.ttf");
 
   assets.bgm = loadSound("sounds/bgm.mp3");
+
+  ruleLines = loadStrings("texts/rules.txt");
 }
 
 function setup() {
@@ -158,7 +164,11 @@ function setup() {
   // 플레이어 캐릭터 생성
   player = new Player();
 
-  updateUIPositions();  // 버튼 위치
+  // 버튼 위치
+  updateUIPositions();
+
+  // 룰 텍스트 파싱
+  RULE = parseRules(ruleLines);
 }
 
 function windowResized() {
@@ -216,6 +226,36 @@ function drawImageButton(btn, img) {
 // 캔버스를 브라우저 화면 정중앙에 위치시키는 계산
 function centerCanvas() {
   canvas.position((windowWidth - width) / 2, 0);
+}
+
+// rules.txt 파싱
+function parseRules(textLines) {
+  let sections = {};
+  let currentKey = null;
+  let buffer = [];
+
+  for (let line of textLines) {
+    if (line.startsWith('#')) {
+      // 새 섹션 시작 → 이전 섹션 저장
+      if (currentKey) {
+        sections[currentKey] = buffer.slice();
+      }
+      currentKey = line.substring(1).trim(); // "#TITLE" → "TITLE"
+      buffer = [];
+    } else if (line.trim() === '---') {
+      // 구분선은 무시
+      continue;
+    } else if (line.trim().length > 0) {
+      buffer.push(line);
+    }
+  }
+
+  // 마지막 섹션 저장
+  if (currentKey) {
+    sections[currentKey] = buffer;
+  }
+
+  return sections;
 }
 
 // ==========================================
@@ -1303,13 +1343,17 @@ function drawRuleScreen() {
   }
 
   // 룰 설명 박스
-  let panelW = width - 80;
+  let panelW = width - 100;
   let panelH = 650;
   let panelX = (width - panelW) / 2;
   let panelY = height / 2 - panelH / 2;
 
+  noStroke();
   fill(255, 255, 255, 230);
   rect(panelX, panelY, panelW, panelH, 25);
+
+  // 텍스트 그리기
+  drawRuleTexts(panelX, panelY, panelW, panelH);
 
   // 우하단 '게임 모드 선택하기' 버튼
   if (assets.nextBtn) {
@@ -1320,34 +1364,150 @@ function drawRuleScreen() {
   drawRuleNextControl();
 }
 
+function drawRuleTexts(panelX, panelY, panelW, panelH) {
+  let centerX = panelX + panelW / 2;
+  let y = panelY + 20;
+  let leftX = panelX + 50;
+
+  // 1) 게임 설명
+  textAlign(CENTER, TOP);
+  textFont(assets.titleFont);
+  textSize(25);
+  fill(35, 80, 180);
+  text(RULE.TITLE[0], centerX, y);
+
+  // 2) 슬로건
+  y += 50;
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(20);
+  fill(40);
+  for (let line of RULE.TITLE_DESC) {
+    text(line, centerX, y);
+    y += 24;
+  }
+
+  y += 30;
+
+  // 3) FACE MODE 타이틀
+  textAlign(LEFT, TOP);
+  textFont(assets.titleFont);
+  textSize(23);
+  fill(35, 80, 180);
+  text(RULE.FACE_MODE_TITLE[0], leftX, y);
+
+  // 4) FACE MODE 설명
+  y += 35;
+  textAlign(LEFT, TOP);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(18);
+  fill(40);
+  text(RULE.FACE_MODE_DESC[0], leftX, y);
+
+  // 5) FACE MODE 규칙
+  fill(90);
+  for (let line of RULE.FACE_MODE_RULES) {
+    y += 26;
+    text(line, leftX, y);
+  }
+
+  // 6) 얼굴 각도 주의
+  y += 32;
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(18);
+  fill(40);
+  text(RULE.FACE_ANGLE_TITLE[0], leftX, y);
+
+  fill(90);
+  for (let line of RULE.FACE_ANGLE_RULES) {
+    y += 24;
+    text(line, leftX, y);
+  }
+
+  // 7) VOICE MODE 타이틀
+  y += 40;
+  textAlign(LEFT, TOP);
+  textFont(assets.titleFont);
+  textSize(23);
+  fill(35, 80, 180);
+  text(RULE.VOICE_MODE_TITLE[0], leftX, y);
+
+  // 8) VOICE MODE 설명
+  y += 35;
+  textAlign(LEFT, TOP);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(18);
+  fill(40);
+  text(RULE.VOICE_MODE_DESC[0], leftX, y);
+
+  // 9) VOICE MODE 규칙
+  fill(90);
+  for (let line of RULE.VOICE_MODE_RULES) {
+    y += 26;
+    text(line, leftX, y);
+  }
+
+  // 10) GAME OVER
+  y += 40;
+  textAlign(LEFT, TOP);
+  textFont(assets.bodyFont);
+  textSize(18);
+  fill(200, 60, 60);  // 눈에 띄는 빨간 계열 추천
+  if (RULE.GAME_OVER) {
+    for (let line of RULE.GAME_OVER) {
+      text(line, leftX, y);
+      y += 26;
+    }
+  }
+
+  // 11) Goal
+  y += 30;
+  textAlign(CENTER, TOP);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(23);
+  fill(240, 180, 30);
+  text(RULE.GOAL_TITLE[0], centerX, y);
+
+  y += 30;
+  textSize(20);
+  fill(40);
+  for (let line of RULE.GOAL_DESC) {
+    text(line, centerX, y);
+    y += 24;
+  }
+}
+
 function drawRuleNextControl() {
   // 클릭 영역을 ruleNextBtn에 맞춤
-  ruleNextBtn.w = 260;
-  ruleNextBtn.h = 50;
-  ruleNextBtn.x = width - ruleNextBtn.w - 40;
-  ruleNextBtn.y = height - ruleNextBtn.h - 40;
+  ruleNextBtn.w = 200;
+  ruleNextBtn.h = 40;
+  ruleNextBtn.x = width - ruleNextBtn.w - 50;
+  ruleNextBtn.y = height - ruleNextBtn.h - 30;
 
   let x = ruleNextBtn.x;
   let y = ruleNextBtn.y;
   let w = ruleNextBtn.w;
   let h = ruleNextBtn.h;
 
-  // 마우스 올렸는지 체크 (hover 효과용)
+  // hover 판정
   let hover =
     mouseX > x && mouseX < x + w &&
     mouseY > y && mouseY < y + h;
 
-  // 배경 살짝 칠해주기 (클릭 영역 표시)
+  // 배경
   noStroke();
   fill(hover ? 255 : 240, 240, 240, 210);
-  rect(x, y, w, h, 20);
+  rect(x, y, w, h, 15);
 
-  // 삼각형(▶) 그리기
-  let triCx = x + 20;          // 삼각형 중심 x
-  let triCy = y + h / 2;       // 삼각형 중심 y
-  let triSize = 10;            // 삼각형 크기
+  // 공통 중심
+  const centerY = y + h / 2;
 
-  fill(hover ? 80 : 100);
+  // ▶ 삼각형 위치
+  const triSize = 9;
+  const paddingRight = 15;  // 오른쪽 여백
+  const triCx = x + w - paddingRight - triSize;
+  const triCy = centerY;
+
+  fill(hover ? 70 : 90);
   noStroke();
   triangle(
     triCx - triSize, triCy - triSize,
@@ -1355,14 +1515,21 @@ function drawRuleNextControl() {
     triCx + triSize, triCy
   );
 
-  // 텍스트: "게임 모드 선택하기"
-  textFont(assets.titleFont);
-  textAlign(LEFT, CENTER);
-  textSize(18);
-  fill(hover ? 50 : 80);
-  text("게임 모드 선택하기", triCx + 15, triCy);
-}
+  // "게임 모드 선택하기"
+  const label = "게임 모드 선택하기";
 
+  textFont(assets.titleFont);
+  textSize(18);
+  textAlign(RIGHT, CENTER);
+  fill(hover ? 50 : 80);
+
+  // 텍스트 배치
+  const gap = 10;  // 텍스트와 삼각형 사이 간격
+  const textX = triCx - triSize - gap;
+  const textY = centerY - 4;  //높이맞춤
+
+  text(label, textX, textY);
+}
 
 // 모드 선택 화면
 function drawModeSelectScreen() {

@@ -1,0 +1,55 @@
+#TITLE
+게임 설명
+---
+
+#TITLE_DESC
+“피하고! 점프하고! 살아남자!” 
+얼굴·목소리로 즐기는 장애물 피하기 게임
+---
+
+#FACE_MODE_TITLE
+▶ FACE MODE
+---
+
+#FACE_MODE_DESC
+표정으로 장애물을 피하세요!
+---
+
+#FACE_MODE_RULES
+웃음 / 놀람 → 점프
+화남 / 슬픔 / 공포 / 역겨움 → 숙이기
+---
+
+#FACE_ANGLE_TITLE
+[주의] 얼굴 각도
+---
+
+#FACE_ANGLE_RULES
+고개를 기울이거나 돌리면 일시정지
+정면을 보면 자동으로 재개
+---
+
+#VOICE_MODE_TITLE
+▶ VOICE MODE
+---
+
+#VOICE_MODE_DESC
+목소리의 높낮이로 장애물을 피하세요!
+---
+
+#VOICE_MODE_RULES
+기준 피치보다 높아지면 → 점프
+기준 피치보다 낮아지면 → 숙이기 
+---
+
+#GAME_OVER
+※ 장애물에 부딪히면 GAME OVER
+---
+
+#GOAL_TITLE
+★ GOAL ★
+---
+
+#GOAL_DESC
+최대한 오래 버티며,
+생존 시간 최고 기록에 도전하세요!
