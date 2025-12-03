@@ -933,51 +933,72 @@ class Player {
     checkObstacleCollision(obstacles) {
       if (this.isDead) return;
 
-      // 히트박스를 실제 이미지보다 조금 작게
-      const hitW = this.size * 0.6; 
-      const hitH = this.size * 0.7; 
+      // 1. 내 캐릭터(플레이어) 판정 줄이기
+      // 이미지 크기(80px) 그대로 쓰면 스치기만 해도 죽으니까 좀 더 안쪽으로 잡음
+      const hitW = this.size * 0.5; // 너비를 절반(50%)으로 줄임
+      const hitH = this.size * 0.7; // 높이를 70%로 줄임
 
-      // 플레이어 월드 좌표 (중심 기준)
+      // 플레이어의 히트박스 좌표 계산 (중심 기준)
       const pxCenterWorld = this.x + worldOffset;
-      const px1 = pxCenterWorld - this.size / 2;
-      const px2 = pxCenterWorld + this.size / 2;
-      const py1 = this.y - this.size / 2;
-      const py2 = this.y + this.size / 2;
+      const px1 = pxCenterWorld - hitW / 2; // 왼쪽 끝
+      const px2 = pxCenterWorld + hitW / 2; // 오른쪽 끝
+      const py1 = this.y - hitH / 2;        // 머리 끝
+      const py2 = this.y + hitH / 2;        // 발 끝
 
       for (let ob of obstacles) {
-        // 장애물 AABB
-        const ox1 = ob.x;
-        const ox2 = ob.x + ob.w;
-        const oy1 = ob.y - ob.h;
-        const oy2 = ob.y;
+        // 장애물의 원래 네모 박스 좌표 가져오기
+        let ox1 = ob.x;
+        let ox2 = ob.x + ob.w;
+        let oy1 = ob.y - ob.h; // 장애물 꼭대기
+        let oy2 = ob.y;        // 장애물 바닥
 
+        // 2. 장애물 종류별로 히트박스 깎기 (여기가 핵심!)
+        if (ob.type === 'spike') {
+            // [세모 장애물 보정]
+            // 위쪽 뾰족한 부분은 사실상 허공이므로 판정을 많이 낮춤 (40% 내림)
+            oy1 = oy1 + (ob.h * 0.4); 
+            
+            // 좌우 빈 공간도 안쪽으로 밀어 넣음 (각각 20%씩)
+            ox1 = ox1 + (ob.w * 0.2);
+            ox2 = ox2 - (ob.w * 0.2);
+        }
+        else if (ob.type === 'saw') {
+            // [톱니 장애물 보정]
+            // 동그라미 모양이므로 사각형의 네 귀퉁이를 살짝 깎아줌 (15%씩)
+            const padding = ob.w * 0.15;
+            ox1 += padding;
+            ox2 -= padding;
+            oy1 += padding;
+            oy2 -= padding;
+        }
+
+        // 3. 최종 충돌 검사 (AABB 방식: 겹쳤는가?)
         const overlap =
-            px1 < ox2 &&
-            px2 > ox1 &&
-            py1 < oy2 &&
-            py2 > oy1;
+            px1 < ox2 &&  // 내 왼쪽이 장애물 오른쪽보다 안쪽이고
+            px2 > ox1 &&  // 내 오른쪽이 장애물 왼쪽보다 안쪽이고
+            py1 < oy2 &&  // 내 머리가 장애물 바닥보다 위쪽이고
+            py2 > oy1;    // 내 발이 장애물 머리보다 아래쪽인가?
 
-        if (!overlap) continue;
+        if (!overlap) continue; // 안 겹쳤으면 통과
 
-        // 타입별 판정
+        // 4. 충돌 시 처리
         if (ob.type === 'saw') {
-          // 톱니 : 숙이고 있으면 통과, 아니면 죽음
+          // 톱니는 숙이기(crouch) 상태면 무사 통과
           if (this.isCrouching) {
-            // 숙인 상태면 그냥 통과 (충돌 무시)
             continue;
           } else {
-            this.die();
+            this.die(); // 서 있으면 사망
             return;
           }
         }
 
         if (ob.type === 'spike') {
-          // 스파이크 : 닿으면 바로 죽음
+          // 스파이크는 닿으면 무조건 사망
           this.die();
           return;
         }
       }
-  }
+    }
   
 
     // 발판과 부딪혔는지 검사하는 함수
