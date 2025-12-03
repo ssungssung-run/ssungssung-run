@@ -10,15 +10,15 @@ const CONFIG = {
     // [물리 엔진 설정]
     gravity: 0.9,       // 중력: 매 프레임마다 아래로 당기는 힘 (클수록 빨리 떨어짐)
     jumpPower: -20,     // 점프력: 위로 솟구치는 힘 (음수여야 화면 위쪽인 Y=0 방향으로 감)
-    moveSpeed: 4,       // 맵 이동 속도: 배경이 왼쪽으로 흐르는 속도
+    moveSpeed: 5,       // 맵 이동 속도: 배경이 왼쪽으로 흐르는 속도
 
     // [발판(플랫폼) 생성 규칙]
     platform: {
         minYRatio: 0.4, // 발판이 생성될 수 있는 가장 높은 위치 (화면 상단 40%)
         maxYRatio: 0.7, // 발판이 생성될 수 있는 가장 낮은 위치 (화면 하단 70%)
         maxDeltaY: 70,  // 다음 발판이 이전 발판보다 얼마나 높거나 낮을 수 있는지 (난이도 조절)    
-        wNormal: { min: 220, max: 270 }, // 일반 발판 너비 범위
-        wThin: { min: 200, max: 360 },     // 좁은 발판 너비 범위
+        wNormal: { min: 250, max: 310 }, // 일반 발판 너비 범위
+        wThin: { min: 210, max: 230 },     // 좁은 발판 너비 범위
         thinProb: 0.3   // 좁은 발판이 나올 확률 (0.3 = 30%)    
     },
 
@@ -29,7 +29,7 @@ const CONFIG = {
       sawHeight: 65,       // 톱니가 발판 위에서 얼마나 위로 뜨는지(픽셀)
 
       // 이 길이 이상일 때만 장애물 생성
-      minPlatformWidthForObstacle: 250   // 숫자 바꿔가며 조절 가능
+      minPlatformWidthForObstacle: 270   // 숫자 바꿔가며 조절 가능
     },
  
     // [얼굴 인식 민감도 설정]
@@ -409,7 +409,7 @@ function addRandomPlatform(startX, prevY) {
 
 // 특정 발판 p 위/근처에 장애물을 확률적으로 생성
 function addObstacleForPlatform(p) {
-  // 너비가 250 이상인 발판에만 장애물 생성
+  // 너비가 270 이상인 발판에만 장애물 생성
   if (p.w < CONFIG.obstacle.minPlatformWidthForObstacle) return;
 
   // 0.0 ~ 1.0 사이 랜덤값
@@ -532,7 +532,7 @@ function updateInfinitePlatforms() {
 
   // 3. 화면 오른쪽 끝보다 더 멀리 발판을 미리 생성해둠 (끊기지 않게)
   while (farthestX - worldOffset < width * 1.5) {
-    let gap = random(15, 25); // 점프해서 건너갈 구멍 크기
+    let gap = random(15, 20); // 점프해서 건너갈 구멍 크기
     let newX = farthestX + gap;
     addRandomPlatform(newX, prevY);
     
@@ -976,7 +976,7 @@ class Player {
       // 1. 내 캐릭터(플레이어) 판정 줄이기
       // 이미지 크기(80px) 그대로 쓰면 스치기만 해도 죽으니까 좀 더 안쪽으로 잡음
       const hitW = this.size * 0.5; // 너비를 절반(50%)으로 줄임
-      const hitH = this.size * 0.7; // 높이를 70%로 줄임
+      const hitH = this.size * 0.85; // 높이를 85%로 줄임
 
       // 플레이어의 히트박스 좌표 계산 (중심 기준)
       const pxCenterWorld = this.x + worldOffset;
@@ -992,7 +992,7 @@ class Player {
         let oy1 = ob.y - ob.h; // 장애물 꼭대기
         let oy2 = ob.y;        // 장애물 바닥
 
-        // 2. 장애물 종류별로 히트박스 깎기 (여기가 핵심!)
+        // 2. 장애물 종류별로 히트박스 깎기
         if (ob.type === 'spike') {
             // [세모 장애물 보정]
             // 위쪽 뾰족한 부분은 사실상 허공이므로 판정을 많이 낮춤 (40% 내림)
