@@ -17,7 +17,7 @@ const CONFIG = {
         minYRatio: 0.4, // 발판이 생성될 수 있는 가장 높은 위치 (화면 상단 40%)
         maxYRatio: 0.7, // 발판이 생성될 수 있는 가장 낮은 위치 (화면 하단 70%)
         maxDeltaY: 70,  // 다음 발판이 이전 발판보다 얼마나 높거나 낮을 수 있는지 (난이도 조절)    
-        wNormal: { min: 250, max: 310 }, // 일반 발판 너비 범위
+        wNormal: { min: 250, max: 400 }, // 일반 발판 너비 범위
         wThin: { min: 210, max: 230 },     // 좁은 발판 너비 범위
         thinProb: 0.3   // 좁은 발판이 나올 확률 (0.3 = 30%)    
     },
@@ -29,7 +29,7 @@ const CONFIG = {
       sawHeight: 65,       // 톱니가 발판 위에서 얼마나 위로 뜨는지(픽셀)
 
       // 이 길이 이상일 때만 장애물 생성
-      minPlatformWidthForObstacle: 270   // 숫자 바꿔가며 조절 가능
+      minPlatformWidthForObstacle: 350   // 숫자 바꿔가며 조절 가능
     },
  
     // [얼굴 인식 민감도 설정]
@@ -74,6 +74,7 @@ let startBtn     = { x: 0, y: 0, w: 0, h: 0 };
 let ruleNextBtn  = { x: 0, y: 0, w: 0, h: 0 };
 let faceBtn      = { x: 0, y: 0, w: 0, h: 0 };
 let voiceBtn     = { x: 0, y: 0, w: 0, h: 0 };
+let creditBtn    = { x: 0, y: 0, w: 0, h: 0 };
 
 // 게임 상태 관리
 let gameState = 'intro';
@@ -185,6 +186,12 @@ function updateUIPositions() {
   startBtn.h = 70;
   startBtn.x = width / 2 - startBtn.w / 2;
   startBtn.y = height / 2 - 110;
+
+  // 1-1) 인트로 화면 - Credit 버튼 (START 버튼 아래)
+  creditBtn.w = 200;
+  creditBtn.h = 50;
+  creditBtn.x = width / 2 - creditBtn.w / 2;
+  creditBtn.y = height / 2 - 20;
 
   // 2) 모드 선택 화면 - Face / Voice 버튼
   faceBtn.w = 330;
@@ -535,7 +542,7 @@ function updateInfinitePlatforms() {
 
   // 3. 화면 오른쪽 끝보다 더 멀리 발판을 미리 생성해둠 (끊기지 않게)
   while (farthestX - worldOffset < width * 1.5) {
-    let gap = random(15, 20); // 점프해서 건너갈 구멍 크기
+    let gap = random(150, 180); // 점프해서 건너갈 구멍 크기
     let newX = farthestX + gap;
     addRandomPlatform(newX, prevY);
     
