@@ -64,7 +64,7 @@ let bodyFont;
 
 // 이미지 파일들을 담아둘 객체
 let assets = {
-    introBg: null, logo: null, idle: null, jump: null, waves: [], titleFont: null, bodyFont: null, bgm: null
+    introBg: null, logo: null, logoBlack: null, logoWhite: null, idle: null, jump: null, waves: [], titleFont: null, bodyFont: null, bgm: null
 };
 
 let isModelReady = false;   // AI 모델이 로딩 다 됐는지 확인하는 깃발
@@ -131,6 +131,8 @@ function preload() {
   assets.introBg = loadImage("images/intro_bg.png");
   assets.ruleBg = loadImage("images/rule_bg.png")
   assets.logo = loadImage("images/logo.png");
+  assets.logoBlack = loadImage("images/logo_black.png");
+  assets.logoWhite = loadImage("images/logo_white.png");
 
   assets.startBtn = loadImage("images/btn_start.png");
   assets.faceBtn = loadImage("images/btn_face.png");
@@ -278,8 +280,9 @@ function draw() {
     background(60);
   }
   // 2) 현재 게임 상태(gameState)에 따라 다른 화면을 보여주기
-    if (gameState === 'intro') {
-  drawIntroScreen();
+  if (gameState === 'intro') {
+    drawIntroScreen();
+    drawGameLogo(); // 게임 로고 (하단)
   } 
   else if (gameState === 'credit') {
     drawCreditScreen();
@@ -1845,11 +1848,29 @@ function drawGameOverScreen() {
   textSize(50); text("GAME OVER", width/2, height/2 - 50);
   textSize(30); text(`Score: ${score}s`, width/2, height/2 + 20);
   textSize(20); text("Click to Menu", width/2, height/2 + 120);
+  
+  // 게임 오버 화면에 흰색 로고 표시
+  if (assets.logoWhite) {
+    imageMode(CENTER);
+    let logoW = 500;
+    let logoH = logoW * (assets.logoWhite.height / assets.logoWhite.width);
+    image(assets.logoWhite, width / 2, height - 80, logoW, logoH);
+  }
 }
 
 function drawScore() {
   fill(255); textSize(30); textAlign(LEFT, TOP);
   text(`Time: ${score}s`, 20, 20);
+}
+
+// 게임 메인 화면 하단에 검은색 로고 표시
+function drawGameLogo() {
+  if (assets.logoBlack) {
+    imageMode(CENTER);
+    let logoW = 350;
+    let logoH = logoW * (assets.logoBlack.height / assets.logoBlack.width);
+    image(assets.logoBlack, 150, height - 40, logoW, logoH);
+  }
 }
 
 function drawWarningOverlay() {
