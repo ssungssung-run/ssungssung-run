@@ -274,6 +274,9 @@ function draw() {
     if (gameState === 'intro') {
   drawIntroScreen();
   } 
+  else if (gameState === 'credit') {
+    drawCreditScreen();
+  }
   else if (gameState === 'rule') {
     drawRuleScreen();
   } 
@@ -1331,6 +1334,9 @@ function drawIntroScreen() {
   if (assets.startBtn) {
     drawImageButton(startBtn, assets.startBtn);
   }
+
+  // Credit 버튼
+  drawCreditButton();
 }
 
 function drawRuleScreen() {
@@ -1557,6 +1563,204 @@ function drawModeSelectScreen() {
 
 }
 
+// Credit 버튼 그리기
+function drawCreditButton() {
+  let hover = isInside(creditBtn);
+  let scaleFactor = hover ? 1.05 : 1.0;
+
+  push();
+  translate(creditBtn.x + creditBtn.w / 2, creditBtn.y + creditBtn.h / 2);
+  scale(scaleFactor);
+  
+  noStroke();
+  fill(hover ? 100 : 80, 100, 150, 200);
+  rectMode(CENTER);
+  rect(0, 0, creditBtn.w, creditBtn.h, 15);
+  
+  textAlign(CENTER, CENTER);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(20);
+  fill(255);
+  text("Credit", 0, 0);
+  
+  pop();
+}
+
+function drawCreditScreen() {
+  // 1. 전체 배경 렌더링
+  if (assets.introBg) {
+    push();
+    imageMode(CORNER);
+    image(assets.introBg, 0, 0, width, height);
+    pop();
+  } else {
+    background(20);
+  }
+
+  // 2. 메인 패널 (팝업창 스타일)
+  let panelW = width - 100; // 좌우 여백 확보
+  let panelH = height - 80;
+  let panelX = (width - panelW) / 2;
+  let panelY = (height - panelH) / 2;
+
+  noStroke();
+  fill(255, 255, 255, 245); // 가독성을 위해 불투명도 약간 높임
+  rect(panelX, panelY, panelW, panelH, 20);
+
+  // --- 컨텐츠 시작 (세로로 나열) ---
+  let contentTop = panelY + 40;
+  let centerX = width / 2;
+
+  // 3. 타이틀 & 팀원 정보 (상단 중앙 배치)
+  textAlign(CENTER, TOP);
+  
+  // 제목
+  textFont(assets.titleFont);
+  textSize(36);
+  fill(35, 80, 180);
+  text("Credit", centerX, contentTop);
+  
+  // 학과
+  contentTop += 50;
+  textSize(20);
+  fill(40);
+  text("숭실대학교 디지털미디어학과", centerX, contentTop);
+
+  // 팀원
+  contentTop += 35;
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(15);
+  fill(60);
+  text("20251676 노주현 | 20251681 배소현 | 20251685 양재훈", centerX, contentTop);
+
+  // 구분선
+  contentTop += 40;
+  stroke(200);
+  strokeWeight(1);
+  line(panelX + 40, contentTop, panelX + panelW - 40, contentTop);
+
+  // 4. 상세 내용 (세로로 나열)
+  let sectionY = contentTop + 30;
+  let titleSize = 18;
+  let bodySize = 16;
+  let lineHeight = 20;
+
+  // --- 사용 기술 스택 ---
+  textAlign(LEFT, TOP);
+  fill(35, 80, 180);
+  textFont(assets.titleFont);
+  textSize(titleSize);
+  text("사용 기술 (Tech Stack)", panelX + 40, sectionY);
+
+  fill(70);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(bodySize);
+
+  let techList = [
+    "JavaScript (ES6+)",
+    " - Class 기반 객체지향 및 모듈화",
+    " - Arrow Function, 구조 분해 할당",
+    "",
+    "p5.js (Graphic & Audio)",
+    " - Canvas 2D 그래픽 렌더링",
+    " - p5.sound: 오디오 분석 및 반응형 처리",
+    "",
+    "ml5.js (AI & Vision)",
+    " - FaceAPI: 68개 랜드마크 & 표정 감지",
+    " - PitchDetection: CREPE 모델 음성 분석"
+  ];
+
+  let currentY = sectionY + 40;
+  for (let line of techList) {
+    text(line, panelX + 40, currentY);
+    currentY += lineHeight;
+  }
+
+  // --- 게임 구현 컨셉 ---
+  currentY += 20; // 간격 추가
+  fill(35, 80, 180);
+  textFont(assets.titleFont);
+  textSize(titleSize);
+  text("구현 컨셉 (Features)", panelX + 40, currentY);
+
+  fill(70);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(bodySize);
+
+  let conceptList = [
+    "시스템 (System)",
+    " - 절차적 맵 생성 (무한 스크롤 & 오브젝트 풀링)",
+    " - 물리 엔진: 중력, 가속도, AABB 충돌 처리",
+    " - FSM 상태 관리 (Intro → Play → End)",
+    "",
+    "인터랙션 (Interaction)",
+    " - Face Mode: 표정(Happy) 점프 & 자세 교정",
+    " - Voice Mode: 피치(고/저) 기반 점프/앉기",
+    " - 실시간 캘리브레이션 & 노이즈 필터링"
+  ];
+
+  currentY += 40;
+  for (let line of conceptList) {
+    text(line, panelX + 40, currentY);
+    currentY += lineHeight;
+  }
+
+  // --- AI 생성 컨텐츠 ---
+  currentY += 20;
+  fill(35, 80, 180);
+  textFont(assets.titleFont);
+  textSize(titleSize);
+  text("AI 생성 컨텐츠 (Content)", panelX + 40, currentY);
+
+  fill(70);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(bodySize);
+
+  let aiUsedList = [
+    "AI 생성 컨텐츠 (Content)",
+    " - 슝슝이 이미지",
+    " - 배경음악",
+    "",
+    "AI 생성 코드 (Code)",
+    " - 게임 메인 로직 (XX% AI)",
+    " - Pitch Detection 모델 (30% AI)",
+    " - Face Expressions 모델 (XX% AI)",
+  ];
+
+  currentY += 40;
+  for (let line of aiUsedList) {
+    text(line, panelX + 40, currentY);
+    currentY += lineHeight;
+  }
+
+  // 5. 뒤로가기 버튼 (하단 고정)
+  let backBtnW = 160;
+  let backBtnH = 50;
+  let backBtnX = width / 2 - backBtnW / 2;
+  let backBtnY = panelY + panelH - backBtnH - 30;
+
+  let hover = isInside({ x: backBtnX, y: backBtnY, w: backBtnW, h: backBtnH });
+  
+  noStroke();
+  // 호버 효과: 마우스 올리면 색상 진하게
+  if (hover) fill(80, 120, 200); 
+  else fill(100, 140, 220);
+  
+  rect(backBtnX, backBtnY, backBtnW, backBtnH, 15);
+
+  textAlign(CENTER, CENTER);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(20);
+  fill(255);
+  text("메인으로", backBtnX + backBtnW / 2, backBtnY + backBtnH / 2);
+}
+
+// (참고용) 간단한 호버 체크 함수
+function isInside(rectObj) {
+  return mouseX > rectObj.x && mouseX < rectObj.x + rectObj.w &&
+         mouseY > rectObj.y && mouseY < rectObj.y + rectObj.h;
+}
+
 // 로딩 바 그리기
 function drawLoadingScreen() {
   fill(0, 150); // 반투명 검은 배경
@@ -1658,6 +1862,27 @@ function mousePressed() {
   if (gameState === 'intro') {
     if (isInside(startBtn)) {
       gameState = 'rule';
+      return;
+    }
+    // Credit 버튼 클릭
+    if (isInside(creditBtn)) {
+      gameState = 'credit';
+      return;
+    }
+  }
+
+  // Credit 화면 → 뒤로가기 버튼 클릭
+  if (gameState === 'credit') {
+    let backBtnW = 150;
+    let backBtnH = 45;
+    let panelW = width - 80;
+    let panelH = min(height - 100, 600);
+    let panelY = (height - panelH) / 2;
+    let backBtnX = width / 2 - backBtnW / 2;
+    let backBtnY = panelY + panelH - backBtnH - 20;
+    
+    if (isInside({ x: backBtnX, y: backBtnY, w: backBtnW, h: backBtnH })) {
+      gameState = 'intro';
       return;
     }
   }
