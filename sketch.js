@@ -62,6 +62,10 @@ let RULE = {};
 let titleFont;
 let bodyFont;
 
+// 크레딧 스크롤
+let creditScrollOffset = 0;
+let creditMaxScroll = 0;
+
 // 이미지 파일들을 담아둘 객체
 let assets = {
     introBg: null, logo: null, logoBlack: null, logoWhite: null, idle: null, jump: null, waves: [], titleFont: null, bodyFont: null, bgm: null
@@ -75,6 +79,8 @@ let ruleNextBtn  = { x: 0, y: 0, w: 0, h: 0 };
 let faceBtn      = { x: 0, y: 0, w: 0, h: 0 };
 let voiceBtn     = { x: 0, y: 0, w: 0, h: 0 };
 let creditBtn    = { x: 0, y: 0, w: 0, h: 0 };
+let creditBackBtn = { x: 0, y: 0, w: 0, h: 0 };
+let modeBackBtn  = { x: 0, y: 0, w: 0, h: 0 };
 
 // 게임 상태 관리
 let gameState = 'intro';
@@ -156,7 +162,7 @@ function preload() {
 
 function setup() {
   canvas = createCanvas(CONFIG.gameW, windowHeight);
-  centerCanvas();
+  canvas.parent('canvas-wrap');
   waterLevel = height * CONFIG.waterRatio;
 
   // 웹캠 설정 (비율은 원본 그대로, 나중에 그릴 때 크롭)
@@ -176,7 +182,6 @@ function setup() {
 
 function windowResized() {
   resizeCanvas(CONFIG.gameW, windowHeight);
-  centerCanvas();
   waterLevel = height * CONFIG.waterRatio;
   updateUIPositions();
 }
@@ -1571,6 +1576,25 @@ function drawModeSelectScreen() {
   drawImageButton(faceBtn, assets.faceBtn);
   drawImageButton(voiceBtn, assets.voiceBtn);
 
+  // "메인으로" 버튼
+  modeBackBtn.w = 160;
+  modeBackBtn.h = 50;
+  modeBackBtn.x = width / 2 - modeBackBtn.w / 2;
+  modeBackBtn.y = height - modeBackBtn.h - 40; 
+
+  let hover = isInside(modeBackBtn);
+
+  push();
+  noStroke();
+  fill(hover ? 80 : 100, 140, 220);
+  rect(modeBackBtn.x, modeBackBtn.y, modeBackBtn.w, modeBackBtn.h, 15);
+
+  textAlign(CENTER, CENTER);
+  textFont(assets.bodyFont || assets.titleFont);
+  textSize(20);
+  fill(255);
+  text("메인으로", modeBackBtn.x + modeBackBtn.w / 2, modeBackBtn.y + modeBackBtn.h / 2);
+  pop();
 }
 
 // Credit 버튼 그리기
@@ -1617,8 +1641,23 @@ function drawCreditScreen() {
   fill(255, 255, 255, 245); // 가독성을 위해 불투명도 약간 높임
   rect(panelX, panelY, panelW, panelH, 20);
 
+  // 패널 내부 스크롤 영역 설정
+  let innerX = panelX + 40;
+  let innerY = panelY + 40;
+  let innerW = panelW - 80;
+  let innerH = panelH - 120; 
+
+  // --- 스크롤/클리핑 시작 ---
+  push();
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.rect(innerX, innerY, innerW, innerH); // 패널 안쪽 영역
+  drawingContext.clip();
+
+  translate(0, -creditScrollOffset);
+
   // --- 컨텐츠 시작 (세로로 나열) ---
-  let contentTop = panelY + 40;
+  let contentTop = innerY;
   let centerX = width / 2;
 
   // 3. 타이틀 & 팀원 정보 (상단 중앙 배치)
@@ -1732,9 +1771,9 @@ function drawCreditScreen() {
     " - 배경음악",
     "",
     "AI 생성 코드 (Code)",
-    " - 게임 메인 로직 (XX% AI)",
+    " - 게임 메인 로직 (50% AI)",
     " - Pitch Detection 모델 (30% AI)",
-    " - Face Expressions 모델 (XX% AI)",
+    " - Face Expressions 모델 (40% AI)",
   ];
 
   currentY += 40;
@@ -1743,11 +1782,26 @@ function drawCreditScreen() {
     currentY += lineHeight;
   }
 
+  // 스크롤 가능한 전체 컨텐츠 높이 계산
+  let contentBottomY = currentY;
+  let contentHeight = contentBottomY - innerY;
+  creditMaxScroll = max(0, contentHeight - innerH);
+
+  // --- 스크롤/클리핑 끝 ---
+  drawingContext.restore();
+  pop();
+
   // 5. 뒤로가기 버튼 (하단 고정)
   let backBtnW = 160;
   let backBtnH = 50;
   let backBtnX = width / 2 - backBtnW / 2;
   let backBtnY = panelY + panelH - backBtnH - 30;
+
+  // 전역 버튼 객체에 실제 좌표 저장
+  creditBackBtn.x = backBtnX;
+  creditBackBtn.y = backBtnY;
+  creditBackBtn.w = backBtnW;
+  creditBackBtn.h = backBtnH;
 
   let hover = isInside({ x: backBtnX, y: backBtnY, w: backBtnW, h: backBtnH });
   
@@ -1895,22 +1949,16 @@ function mousePressed() {
     // Credit 버튼 클릭
     if (isInside(creditBtn)) {
       gameState = 'credit';
+      creditScrollOffset = 0;
       return;
     }
   }
 
   // Credit 화면 → 뒤로가기 버튼 클릭
   if (gameState === 'credit') {
-    let backBtnW = 150;
-    let backBtnH = 45;
-    let panelW = width - 80;
-    let panelH = min(height - 100, 600);
-    let panelY = (height - panelH) / 2;
-    let backBtnX = width / 2 - backBtnW / 2;
-    let backBtnY = panelY + panelH - backBtnH - 20;
-    
-    if (isInside({ x: backBtnX, y: backBtnY, w: backBtnW, h: backBtnH })) {
+    if (isInside(creditBackBtn)) {
       gameState = 'intro';
+      creditScrollOffset = 0;  // 스크롤 초기화
       return;
     }
   }
@@ -1939,6 +1987,13 @@ function mousePressed() {
       selectedMode = 'voice';
       gameState = 'loading';   // 음성 모델 로딩 화면으로 이동
       setupVoiceAPI();         // 음성 인식 로딩 시작
+      return;
+    }
+
+    // 메인으로 버튼
+    if (isInside(modeBackBtn)) {
+      gameState = 'intro';
+      selectedMode = null;
       return;
     }
   }
@@ -1971,7 +2026,7 @@ function startGame() {
 }
 
 // ==========================================
-// 10. 키보드 입력 처리
+// 10. 키보드/마우스 입력 처리
 // ==========================================
 
 function keyPressed() {
@@ -1986,5 +2041,14 @@ function keyPressed() {
   // Voice 모드에서 'C' 키로 재보정
   if ((key === 'c' || key === 'C') && selectedMode === 'voice' && gameState === 'playing') {
     startVoiceCalibration();
+  }
+}
+
+function mouseWheel(event) {
+  // 크레딧 화면 스크롤
+  if (gameState === 'credit') {
+    creditScrollOffset += event.delta; 
+    creditScrollOffset = constrain(creditScrollOffset, 0, creditMaxScroll);
+    return false; 
   }
 }

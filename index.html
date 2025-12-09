@@ -2,7 +2,7 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>Chicken Scream</title>
+    <title>슝슝런</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
@@ -13,11 +13,25 @@
       body {
         margin: 0;
         background: #111;
-        overflow: hidden;
+        display: flex;
+        justify-content: center;
+      }
+      /* 캔버스를 감싸는 컨테이너 */
+      #canvas-wrap {
+        width: 90vw;        /* 화면 너비의 90% */
+        max-width: 520px;   /* CONFIG.gameW에 맞춰 고정 상한 */
+        margin: 0 auto;
+      }
+      /* p5 캔버스를 컨테이너 너비에 맞게 축소/확대 */
+      canvas {
+        width: 100%;
+        height: auto;
+        display: block;
       }
     </style>
   </head>
   <body>
+    <div id="canvas-wrap"></div>
     <script src="sketch.js"></script>
   </body>
 </html>
